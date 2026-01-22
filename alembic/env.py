@@ -7,7 +7,7 @@ from alembic import context
 
 from app.db.base import Base
 from app.core.config import settings
-from app.models.user import User
+import app.models 
 
 from dotenv import load_dotenv
 import os
