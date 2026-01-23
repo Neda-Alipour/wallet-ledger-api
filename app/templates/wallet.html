@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>💰 Wallet Dashboard</h2>
+
+{% if user %}
+<p>Welcome, <strong>{{ user.email }}</strong></p>
+{% endif %}
+
+<div class="card">
+    <p><strong>Balance:</strong> ${{ wallet.balance or "0.00" }}</p>
+</div>
+
+<h3>Recent Transactions</h3>
+
+<table>
+    <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Amount</th>
+    </tr>
+</table>
+{% endblock %}
