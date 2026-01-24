@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, Form, HTTPException
+from fastapi import APIRouter, Depends, Request, Form, HTTPException, status
 from sqlalchemy.orm import Session
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -15,7 +15,11 @@ templates = Jinja2Templates(directory="app/templates")
 def require_user(request: Request):
     user_id = request.session.get("user_id")
     if not user_id:
-        raise HTTPException(status_code=302, headers={"Location": "/login"})
+        # best practice for fastapi
+        raise HTTPException(
+            status_code=status.HTTP_303_SEE_OTHER,
+            headers={"Location": "/login"},
+        )
     return user_id
 
 @router.get("/wallet", response_class=HTMLResponse)
@@ -24,10 +28,23 @@ def wallet(
     user_id: int = Depends(require_user),
     db: Session = Depends(get_db)
 ):
-    wallet, user = db.query(Wallet, User).join(User, Wallet.user_id == User.id).filter(User.id == user_id).first()
+    result = (
+        db.query(Wallet, User)
+        .join(User, Wallet.user_id == User.id)
+        .filter(User.id == user_id)
+        .first()
+    )
 
-    print(f"Wallet Balance: {wallet.balance}")
-    print(f"Username: {user.email}")
+    if not result:
+        raise HTTPException(
+            status_code=status.HTTP_303_SEE_OTHER,
+            headers={"Location": "/login"},
+        )
+    
+    wallet, user = result
+
+    # print(f"Wallet Balance: {wallet.balance}")
+    # print(f"Username: {user.email}")
 
     return templates.TemplateResponse("wallet.html", {
         "request": request, 
