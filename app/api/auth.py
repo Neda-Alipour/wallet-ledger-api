@@ -23,38 +23,36 @@ def signup(
     form: SignupSchema = Depends(SignupSchema.as_form),
     db: Session = Depends(get_db)
 ):
-    
+    # 1. Validation (Outside the transaction to keep it fast)
     existing = db.query(User).filter(User.email == form.email).first()
     if existing:
-        print("User already exists")
         return RedirectResponse(url="/signup", status_code=303)
       
     try:
-        user = User(
-            # full_name=full_name,
-            email=form.email,
-            hashed_password=hash_password(form.password)
-        )
-        db.add(user)
-        db.flush()
+        # 2. Start the Atomic Block
+        with db.begin():
+            user = User(
+                email=form.email,
+                hashed_password=hash_password(form.password)
+            )
+            db.add(user)
+            db.flush()  # Gets the user.id so the wallet can use it
 
-        wallet = Wallet(
-            user_id=user.id, 
-            currency="USD", 
-            balance=0
-        )
-        db.add(wallet)
-
-        db.commit()
-        db.refresh(user)
+            wallet = Wallet(
+                user_id=user.id, 
+                currency="USD", 
+                balance=0
+            )
+            db.add(wallet)
+            # NO NEED FOR db.commit() - it happens automatically here!
 
     except Exception as e:
-        db.rollback()
+        # NO NEED FOR db.rollback() - it happens automatically!
         print(f"Error creating user: {e}")
         return RedirectResponse(url="/signup", status_code=303)
 
+    # 3. Finalize Session
     request.session["user_id"] = str(user.id)
-
     return RedirectResponse(url="/wallet", status_code=303)
 
 @router.get("/login", response_class=HTMLResponse)
@@ -88,3 +86,44 @@ def login(
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/", status_code=303)
+
+# Old version
+# @router.post("/signup")
+# def signup(
+#     request: Request,
+#     form: SignupSchema = Depends(SignupSchema.as_form),
+#     db: Session = Depends(get_db)
+# ):
+    
+#     existing = db.query(User).filter(User.email == form.email).first()
+#     if existing:
+#         print("User already exists")
+#         return RedirectResponse(url="/signup", status_code=303)
+      
+#     try:
+#         user = User(
+#             # full_name=full_name,
+#             email=form.email,
+#             hashed_password=hash_password(form.password)
+#         )
+#         db.add(user)
+#         db.flush()
+
+#         wallet = Wallet(
+#             user_id=user.id, 
+#             currency="USD", 
+#             balance=0
+#         )
+#         db.add(wallet)
+
+#         db.commit()
+#         db.refresh(user)
+
+#     except Exception as e:
+#         db.rollback()
+#         print(f"Error creating user: {e}")
+#         return RedirectResponse(url="/signup", status_code=303)
+
+#     request.session["user_id"] = str(user.id)
+
+#     return RedirectResponse(url="/wallet", status_code=303)
