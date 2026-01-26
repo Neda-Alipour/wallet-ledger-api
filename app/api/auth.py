@@ -23,14 +23,17 @@ def signup(
     form: SignupSchema = Depends(SignupSchema.as_form),
     db: Session = Depends(get_db)
 ):
-    # 1. Validation (Outside the transaction to keep it fast)
-    existing = db.query(User).filter(User.email == form.email).first()
-    if existing:
-        return RedirectResponse(url="/signup", status_code=303)
-      
+    # Use 'with db.begin_nested()' if a transaction has already started
+    # OR just use the session directly since it handles the transaction
+        
     try:
-        # 2. Start the Atomic Block
-        with db.begin():
+        # 1. Start the atomic block immediately
+        with db.begin_nested():
+            # Check for existing user INSIDE the transaction for safety
+            existing = db.query(User).filter(User.email == form.email).first()
+            if existing:
+                return RedirectResponse(url="/signup", status_code=303)
+        
             user = User(
                 email=form.email,
                 hashed_password=hash_password(form.password)
@@ -45,6 +48,8 @@ def signup(
             )
             db.add(wallet)
             # NO NEED FOR db.commit() - it happens automatically here!
+        # After the nested block finishes, we commit the whole session
+        db.commit()
 
     except Exception as e:
         # NO NEED FOR db.rollback() - it happens automatically!

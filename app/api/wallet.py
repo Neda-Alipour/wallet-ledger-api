@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import update, select
 from sqlalchemy.exc import IntegrityError
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.db.session import get_db
 from app.models.user import User
@@ -41,29 +41,46 @@ def wallet(
     db: Session = Depends(get_db)
 ):
     user_id = _coerce_uuid(user_id)
-    
-    result = (
-        db.query(Wallet, User)
-        .join(User, Wallet.user_id == User.id)
-        .filter(User.id == user_id)
-        .first()
-    )
 
-    if not result:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_303_SEE_OTHER,
             headers={"Location": "/login"},
         )
-    
-    wallet, user = result
 
-    # print(f"Wallet Balance: {wallet.balance}")
-    # print(f"Username: {user.email}")
+    wallets = db.query(Wallet).filter(Wallet.user_id == user_id).order_by(Wallet.created_at.asc()).all()
+    if not wallets:
+        # if you always create on signup, this may never happen; still safer to handle.
+        return RedirectResponse(url="/wallet?error=No wallet found", status_code=303)
+
+    wallet_id_param = request.query_params.get("wallet_id")
+    active_wallet = None
+    if wallet_id_param:
+        try:
+            wid = UUID(wallet_id_param)
+            active_wallet = next((w for w in wallets if w.id == wid), None)
+        except Exception:
+            active_wallet = None
+
+    if active_wallet is None:
+        active_wallet = wallets[0]
+
+    recent = (
+        db.query(LedgerEntry, Transaction)
+        .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
+        .filter(LedgerEntry.wallet_id == active_wallet.id)
+        .order_by(LedgerEntry.created_at.desc())
+        .limit(20)
+        .all()
+    )
 
     return templates.TemplateResponse("wallet.html", {
         "request": request, 
         "user": user,
-        "wallet": wallet,
+        "wallet": active_wallet,
+        "wallets": wallets,
+        "recent": recent,
     })
 
 @router.post("/wallet/deposit")
@@ -171,3 +188,117 @@ def withdraw(
 
     except IntegrityError:
         raise HTTPException(status_code=409, detail="Duplicate transaction reference")
+    
+
+# @router.post("/wallet/deposit")
+# def deposit(
+#     request: Request,
+#     wallet_id: str = Form(...),
+#     amount: Decimal = Form(...),
+#     reference: str | None = Form(None),
+#     user_id=Depends(require_user),
+#     db: Session = Depends(get_db),
+# ):
+#     if amount <= 0:
+#         return RedirectResponse(url=f"/wallet?error=Amount must be > 0", status_code=303)
+
+#     user_id = _coerce_uuid(user_id)
+#     try:
+#         wallet_uuid = UUID(wallet_id)
+#     except Exception:
+#         return RedirectResponse(url=f"/wallet?error=Invalid wallet_id", status_code=303)
+
+#     try:
+#         with db.begin():
+#             # ensure wallet belongs to user
+#             w = db.query(Wallet).filter(Wallet.id == wallet_uuid, Wallet.user_id == user_id).first()
+#             if not w:
+#                 return RedirectResponse(url="/wallet?error=Wallet not found", status_code=303)
+
+#             tx = Transaction(type="deposit", status="completed", reference=reference)
+#             db.add(tx)
+#             db.flush()
+
+#             stmt = (
+#                 update(Wallet)
+#                 .where(Wallet.id == wallet_uuid, Wallet.user_id == user_id)
+#                 .values(balance=Wallet.balance + amount)
+#                 .returning(Wallet.balance)
+#             )
+#             new_balance = db.execute(stmt).scalar_one()
+
+#             db.add(LedgerEntry(
+#                 wallet_id=wallet_uuid,
+#                 transaction_id=tx.id,
+#                 amount=amount,  # credit
+#             ))
+
+#         return RedirectResponse(url=f"/wallet?wallet_id={wallet_uuid}&success=Deposit successful", status_code=303)
+
+#     except Exception:
+#         # keep it simple for now; later you can map IntegrityError for duplicate reference etc.
+#         return RedirectResponse(url=f"/wallet?wallet_id={wallet_uuid}&error=Deposit failed", status_code=303)
+
+
+# @router.post("/wallet/withdraw")
+# def withdraw(
+#     request: Request,
+#     wallet_id: str = Form(...),
+#     amount: Decimal = Form(...),
+#     reference: str | None = Form(None),
+#     user_id=Depends(require_user),
+#     db: Session = Depends(get_db),
+# ):
+#     if amount <= 0:
+#         return RedirectResponse(url=f"/wallet?error=Amount must be > 0", status_code=303)
+
+#     user_id = _coerce_uuid(user_id)
+#     try:
+#         wallet_uuid = UUID(wallet_id)
+#     except Exception:
+#         return RedirectResponse(url=f"/wallet?error=Invalid wallet_id", status_code=303)
+
+#     try:
+#         with db.begin():
+#             # Atomic conditional update (prevents race conditions + overdraft)
+#             stmt = (
+#                 update(Wallet)
+#                 .where(
+#                     Wallet.id == wallet_uuid,
+#                     Wallet.user_id == user_id,
+#                     Wallet.balance >= amount,
+#                 )
+#                 .values(balance=Wallet.balance - amount)
+#                 .returning(Wallet.balance)
+#             )
+#             row = db.execute(stmt).first()
+#             if row is None:
+#                 # check if wallet exists (to show correct error)
+#                 exists = db.query(Wallet.id).filter(Wallet.id == wallet_uuid, Wallet.user_id == user_id).first()
+#                 if not exists:
+#                     return RedirectResponse(url="/wallet?error=Wallet not found", status_code=303)
+#                 return RedirectResponse(url=f"/wallet?wallet_id={wallet_uuid}&error=Insufficient funds", status_code=303)
+
+#             new_balance = row[0]
+
+#             tx = Transaction(type="withdrawal", status="completed", reference=reference)
+#             db.add(tx)
+#             db.flush()
+
+#             db.add(LedgerEntry(
+#                 wallet_id=wallet_uuid,
+#                 transaction_id=tx.id,
+#                 amount=-amount,  # debit
+#             ))
+
+#         return RedirectResponse(url=f"/wallet?wallet_id={wallet_uuid}&success=Withdrawal successful", status_code=303)
+
+#     except Exception:
+#         return RedirectResponse(url=f"/wallet?wallet_id={wallet_uuid}&error=Withdrawal failed", status_code=303)
+
+
+# The "Session State" Visualized
+# Step Signup (Crashes) | Deposit (Works)
+# Line 1 db.query(User) → Starts | Txif amount <= 0 → Idle
+# Line 2 if existing: → Active | Tx_coerce_uuid() → Idle
+# Line 3 with db.begin() → ERROR | with db.begin() → Starts Tx

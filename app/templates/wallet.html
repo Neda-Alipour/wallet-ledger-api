@@ -1,23 +1,77 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>💰 Wallet Dashboard</h2>
+<h2>Wallet Dashboard</h2>
 
 {% if user %}
 <p>Welcome, <strong>{{ user.email }}</strong></p>
 {% endif %}
 
+{% if success %}
+<div style="padding:10px; background:#e7f7ea; border:1px solid #bde5c5;">
+  {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div style="padding:10px; background:#fdeaea; border:1px solid #f1b5b5;">
+  {{ error }}
+</div>
+{% endif %}
+
+{% if wallets and wallets|length > 1 %}
+  <h3>Your wallets</h3>
+  <ul>
+    {% for w in wallets %}
+      <li>
+        <a href="/wallet?wallet_id={{ w.id }}">
+          {{ w.currency }} — Balance: {{ w.balance }}
+          {% if w.id == wallet.id %}(active){% endif %}
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
 <div class="card">
-    <p><strong>Balance:</strong> ${{ wallet.balance or "0.00" }}</p>
+  <p><strong>Active Wallet:</strong> {{ wallet.currency }}</p>
+  <p><strong>Balance:</strong> {{ wallet.balance or "0.00" }}</p>
 </div>
 
-<h3>Recent Transactions</h3>
+<h3>Deposit</h3>
+<form method="post" action="/wallet/deposit">
+  <input type="hidden" name="wallet_id" value="{{ wallet.id }}">
+  <label>Amount</label>
+  <input type="number" name="amount" step="0.01" min="0.01" required>
+  <label>Reference (optional)</label>
+  <input type="text" name="reference">
+  <button type="submit">Deposit</button>
+</form>
 
+<h3>Withdraw</h3>
+<form method="post" action="/wallet/withdraw">
+  <input type="hidden" name="wallet_id" value="{{ wallet.id }}">
+  <label>Amount</label>
+  <input type="number" name="amount" step="0.01" min="0.01" required>
+  <label>Reference (optional)</label>
+  <input type="text" name="reference">
+  <button type="submit">Withdraw</button>
+</form>
+
+<h3>Recent Transactions</h3>
 <table>
-    <tr>
-        <th>Date</th>
-        <th>Type</th>
-        <th>Amount</th>
-    </tr>
+  <tr>
+    <th>Date</th>
+    <th>Type</th>
+    <th>Amount</th>
+  </tr>
+
+  {% for entry, tx in recent %}
+  <tr>
+    <td>{{ entry.created_at }}</td>
+    <td>{{ tx.type }}</td>
+    <td>{{ entry.amount }}</td>
+  </tr>
+  {% endfor %}
 </table>
 {% endblock %}
