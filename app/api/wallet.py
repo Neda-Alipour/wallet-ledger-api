@@ -34,7 +34,8 @@ def _coerce_uuid(value) -> UUID:
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid session user_id")
 
-@router.get("/wallet", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse, name="home")
+@router.get("/wallet", response_class=HTMLResponse, name="wallet")
 def wallet(
     request: Request, 
     user_id=Depends(require_user),

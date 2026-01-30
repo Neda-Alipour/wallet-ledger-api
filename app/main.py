@@ -12,6 +12,10 @@ from app.api.wallet import router as wallet_router
 
 app = FastAPI(title="Wallet Ledger API", version="1.0.0")
 
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+templates = Jinja2Templates(directory="app/templates")
+
 @app.exception_handler(RequestValidationError)
 async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
     referer = request.headers.get("referer", "/login")
@@ -42,21 +46,6 @@ app.add_middleware(
     same_site="lax",
     https_only=False # True in production
 )
-
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
-
-templates = Jinja2Templates(directory="app/templates")
-
-def require_user(request: Request):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=302, headers={"Location": "/login"})
-    return user_id
-
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
 
 # Why this happens (important concept)
 
