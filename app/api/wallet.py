@@ -46,15 +46,16 @@ def wallet(
     user_id=Depends(require_user)
 ):
     user_id = _coerce_uuid(user_id)
-
-    user = db.query(User).filter(User.id == user_id).first()
+    result = db.execute(select(User).where(User.id == user_id))
+    user = result.scalars().first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_303_SEE_OTHER,
             headers={"Location": "/login"},
         )
+    result = db.execute(select(Wallet).where(Wallet.user_id == user_id).order_by(Wallet.created_at.asc()))
+    wallets = result.scalars().all()
 
-    wallets = db.query(Wallet).filter(Wallet.user_id == user_id).order_by(Wallet.created_at.asc()).all()
     if not wallets:
         # if you always create on signup, this may never happen; still safer to handle.
         return RedirectResponse(url="/wallet?error=No wallet found", status_code=303)
@@ -71,14 +72,16 @@ def wallet(
     if active_wallet is None:
         active_wallet = wallets[0]
 
-    recent = (
-        db.query(LedgerEntry, Transaction)
+    stmt = (
+        select(LedgerEntry, Transaction)
         .join(Transaction, LedgerEntry.transaction_id == Transaction.id)
-        .filter(LedgerEntry.wallet_id == active_wallet.id)
+        .where(LedgerEntry.wallet_id == active_wallet.id)
         .order_by(LedgerEntry.created_at.desc())
         .limit(20)
-        .all()
     )
+
+    # Returns a list of Row objects (which behave like tuples)
+    recent = db.execute(stmt).all()
 
     return templates.TemplateResponse("wallet.html", {
         "request": request, 

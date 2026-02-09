@@ -1,8 +1,9 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy.orm import Session
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.schemas.auth import SignupSchema, LoginSchema
 from app.db.session import get_db
@@ -34,7 +35,9 @@ def signup(
         # 1. Start the atomic block immediately
         with db.begin_nested():
             # Check for existing user INSIDE the transaction for safety
-            existing = db.query(User).filter(User.email == form.email).first()
+            result = db.execute(select(User).where(User.email == form.email))
+            existing = result.scalars().first()
+            
             if existing:
                 return RedirectResponse(url="/signup", status_code=303)
         
@@ -73,17 +76,16 @@ def login_page(request: Request):
         })
 
 @router.post("/login")
-# TODO: change Depends to Annotated
 # why Annotated not just Session = Depends(get_db)? because we want to specify the type of db parameter as Session for better type hinting and editor support 
 def login(
     request: Request,
     db: db_dependency,
     form: LoginSchema = Depends(LoginSchema.as_form)
 ):
-    
-    # TODO: change query to select statement
     # why execute select? why not just query all? because SQLAlchemy 2.0 style uses select() statements instead of query() method for better clarity and performance.
-    user = db.query(User).filter(User.email == form.email).first()
+    # user = db.query(User).filter(User.email == form.email).first()
+    result = db.execute(select(User).where(User.email == form.email))
+    user = result.scalars().first()
 
     if not user:
         request.session["error"] = "User not found"
