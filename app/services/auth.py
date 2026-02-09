@@ -1,3 +1,4 @@
+from typing import Annotated
 from passlib.context import CryptContext
 from fastapi import Depends, Request, HTTPException
 from sqlalchemy.orm import Session
@@ -14,9 +15,12 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
+# Define a reusable type
+db_dependency = Annotated[Session, Depends(get_db)]
+
 def get_current_user(
     request: Request,
-    db: Session = Depends(get_db)
+    db: db_dependency
 ):
     user_id = request.session.get("user_id")
 

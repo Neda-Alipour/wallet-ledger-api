@@ -1,3 +1,4 @@
+from typing import Annotated
 from decimal import Decimal
 from uuid import UUID
 
@@ -17,6 +18,9 @@ from app.models.ledger import LedgerEntry
 router = APIRouter()
 
 templates = Jinja2Templates(directory="app/templates")
+
+# Define a reusable type
+db_dependency = Annotated[Session, Depends(get_db)]
 
 def require_user(request: Request):
     user_id = request.session.get("user_id")
@@ -38,8 +42,8 @@ def _coerce_uuid(value) -> UUID:
 @router.get("/wallet", response_class=HTMLResponse, name="wallet")
 def wallet(
     request: Request, 
-    user_id=Depends(require_user),
-    db: Session = Depends(get_db)
+    db: db_dependency,
+    user_id=Depends(require_user)
 ):
     user_id = _coerce_uuid(user_id)
 
@@ -87,10 +91,10 @@ def wallet(
 @router.post("/wallet/deposit")
 def deposit(
     request: Request,
+    db: db_dependency,
     amount: Decimal = Form(...),
     reference: str | None = Form(None),
     user_id=Depends(require_user),
-    db: Session = Depends(get_db),
 ):
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be > 0")
@@ -136,10 +140,10 @@ def deposit(
 @router.post("/wallet/withdraw")
 def withdraw(
     request: Request,
+    db: db_dependency,
     amount: Decimal = Form(...),
     reference: str | None = Form(None),
     user_id=Depends(require_user),
-    db: Session = Depends(get_db),
 ):
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be > 0")
@@ -198,7 +202,7 @@ def withdraw(
 #     amount: Decimal = Form(...),
 #     reference: str | None = Form(None),
 #     user_id=Depends(require_user),
-#     db: Session = Depends(get_db),
+#     db: db_dependency,
 # ):
 #     if amount <= 0:
 #         return RedirectResponse(url=f"/wallet?error=Amount must be > 0", status_code=303)
@@ -248,7 +252,7 @@ def withdraw(
 #     amount: Decimal = Form(...),
 #     reference: str | None = Form(None),
 #     user_id=Depends(require_user),
-#     db: Session = Depends(get_db),
+#     db: db_dependency,
 # ):
 #     if amount <= 0:
 #         return RedirectResponse(url=f"/wallet?error=Amount must be > 0", status_code=303)

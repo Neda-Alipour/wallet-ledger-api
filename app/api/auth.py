@@ -1,3 +1,4 @@
+from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 from fastapi.responses import RedirectResponse, HTMLResponse
@@ -13,6 +14,9 @@ router = APIRouter()
 
 templates = Jinja2Templates(directory="app/templates")
 
+# Define a reusable type
+db_dependency = Annotated[Session, Depends(get_db)]
+
 @router.get("/signup", response_class=HTMLResponse)
 def signup_page(request: Request):
     return templates.TemplateResponse("signup.html", {"request": request})
@@ -20,8 +24,8 @@ def signup_page(request: Request):
 @router.post("/signup")
 def signup(
     request: Request,
-    form: SignupSchema = Depends(SignupSchema.as_form),
-    db: Session = Depends(get_db)
+    db: db_dependency,
+    form: SignupSchema = Depends(SignupSchema.as_form)
 ):
     # Use 'with db.begin_nested()' if a transaction has already started
     # OR just use the session directly since it handles the transaction
@@ -69,11 +73,16 @@ def login_page(request: Request):
         })
 
 @router.post("/login")
+# TODO: change Depends to Annotated
+# why Annotated not just Session = Depends(get_db)? because we want to specify the type of db parameter as Session for better type hinting and editor support 
 def login(
     request: Request,
-    form: LoginSchema = Depends(LoginSchema.as_form),
-    db: Session = Depends(get_db)
+    db: db_dependency,
+    form: LoginSchema = Depends(LoginSchema.as_form)
 ):
+    
+    # TODO: change query to select statement
+    # why execute select? why not just query all? because SQLAlchemy 2.0 style uses select() statements instead of query() method for better clarity and performance.
     user = db.query(User).filter(User.email == form.email).first()
 
     if not user:
@@ -97,7 +106,7 @@ def logout(request: Request):
 # def signup(
 #     request: Request,
 #     form: SignupSchema = Depends(SignupSchema.as_form),
-#     db: Session = Depends(get_db)
+#     db: db_dependency
 # ):
     
 #     existing = db.query(User).filter(User.email == form.email).first()
