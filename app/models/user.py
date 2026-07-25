@@ -1,6 +1,7 @@
-from sqlalchemy import String, Boolean, TIMESTAMP, text
-from sqlalchemy.orm import Mapped, mapped_column
 import uuid
+
+from sqlalchemy import Boolean, String, TIMESTAMP, text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 

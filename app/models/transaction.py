@@ -1,18 +1,34 @@
 import uuid
-from sqlalchemy import Column, String, DateTime
+from datetime import datetime
+
+from sqlalchemy import DateTime, String
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
 from app.db.base import Base
 
+
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-
-    type = Column(String, nullable=False)  # deposit, withdrawal, transfer
-    status = Column(String, nullable=False, default="pending")
-
-    reference = Column(String, unique=True, nullable=True)
-
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    type: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="pending",
+    )
+    reference: Mapped[str | None] = mapped_column(
+        String,
+        unique=True,
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
