@@ -1,7 +1,3 @@
-# wallet-ledger-api
-Fintech-style wallet and transaction ledger backend built with FastAPI, PostgreSQL, and Docker. Focused on data integrity, idempotency, and concurrency safety.
-
-
 #  Wallet Ledger API
 
 A production-inspired **Wallet & Ledger backend** built with **FastAPI**, **PostgreSQL**, and **SQLAlchemy 2.0**.
