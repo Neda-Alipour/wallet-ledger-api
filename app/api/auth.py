@@ -3,30 +3,33 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+
 
 from app.schemas.auth import SignupSchema, LoginSchema
-from app.db.session import get_db
+
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.services.auth import hash_password, verify_password
+
+from app.schemas.dependencies import db_dependency, signup_dependency, login_dependency
 
 router = APIRouter()
 
 templates = Jinja2Templates(directory="app/templates")
 
-# Define a reusable type
-db_dependency = Annotated[Session, Depends(get_db)]
-
 @router.get("/signup", response_class=HTMLResponse)
 def signup_page(request: Request):
-    return templates.TemplateResponse("signup.html", {"request": request})
+    return templates.TemplateResponse(
+    request=request,
+    name="signup.html",
+    context={}
+)
 
 @router.post("/signup")
 def signup(
     request: Request,
     db: db_dependency,
-    form: SignupSchema = Depends(SignupSchema.as_form)
+    form: signup_dependency
 ):
     # Use 'with db.begin_nested()' if a transaction has already started
     # OR just use the session directly since it handles the transaction
@@ -70,17 +73,21 @@ def signup(
 @router.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
     error = request.session.pop("error", None)
-    return templates.TemplateResponse("login.html", {
+    return templates.TemplateResponse(
+    request=request,
+    name="login.html",
+    context={
         "request": request,
-        "error": error
-        })
+        "error": error,
+    },
+)
 
 @router.post("/login")
 # why Annotated not just Session = Depends(get_db)? because we want to specify the type of db parameter as Session for better type hinting and editor support 
 def login(
     request: Request,
     db: db_dependency,
-    form: LoginSchema = Depends(LoginSchema.as_form)
+    form: login_dependency
 ):
     # why execute select? why not just query all? because SQLAlchemy 2.0 style uses select() statements instead of query() method for better clarity and performance.
     # user = db.query(User).filter(User.email == form.email).first()
