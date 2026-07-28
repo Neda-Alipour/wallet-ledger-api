@@ -22,6 +22,12 @@ templates = Jinja2Templates(directory="app/templates")
 # Define a reusable type
 db_dependency = Annotated[Session, Depends(get_db)]
 
+def _coerce_uuid(value) -> UUID:
+    try:
+        return value if isinstance(value, UUID) else UUID(str(value))
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid session user_id")
+    
 def require_user(request: Request):
     user_id = request.session.get("user_id")
     if not user_id:
@@ -30,13 +36,7 @@ def require_user(request: Request):
             status_code=status.HTTP_303_SEE_OTHER,
             headers={"Location": "/login"},
         )
-    return user_id
-
-def _coerce_uuid(value) -> UUID:
-    try:
-        return value if isinstance(value, UUID) else UUID(str(value))
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid session user_id")
+    return _coerce_uuid(user_id)
 
 @router.get("/", response_class=HTMLResponse, name="home")
 @router.get("/wallet", response_class=HTMLResponse, name="wallet")
@@ -45,7 +45,7 @@ def wallet(
     db: db_dependency,
     user_id=Depends(require_user)
 ):
-    user_id = _coerce_uuid(user_id)
+    # user_id = _coerce_uuid(user_id)
     result = db.execute(select(User).where(User.id == user_id))
     user = result.scalars().first()
     if not user:
@@ -53,11 +53,12 @@ def wallet(
             status_code=status.HTTP_303_SEE_OTHER,
             headers={"Location": "/login"},
         )
+    
     result = db.execute(select(Wallet).where(Wallet.user_id == user_id).order_by(Wallet.created_at.asc()))
     wallets = result.scalars().all()
 
     if not wallets:
-        # if you always create on signup, this may never happen; still safer to handle.
+        # if we always create wallet on signup, this may never happen; still safer to handle.
         return RedirectResponse(url="/wallet?error=No wallet found", status_code=303)
 
     wallet_id_param = request.query_params.get("wallet_id")
@@ -83,13 +84,22 @@ def wallet(
     # Returns a list of Row objects (which behave like tuples)
     recent = db.execute(stmt).all()
 
-    return templates.TemplateResponse("wallet.html", {
-        "request": request, 
-        "user": user,
-        "wallet": active_wallet,
-        "wallets": wallets,
-        "recent": recent,
-    })
+    success = request.session.pop("success", None)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="wallet.html",
+        context={
+            "request": request, 
+            "user": user,
+            "wallet": active_wallet,
+            "wallets": wallets,
+            "recent": recent,
+            "success": success,
+        }
+    )
+
+# extra info: A transaction creates one or more ledger entries.
 
 @router.post("/wallet/deposit")
 def deposit(
@@ -102,7 +112,7 @@ def deposit(
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be > 0")
 
-    user_id = _coerce_uuid(user_id)
+    # user_id = _coerce_uuid(user_id)
 
     try:
         with db.begin():
@@ -129,11 +139,17 @@ def deposit(
                 amount=amount,  # credit
             ))
 
-        return {
-            "transaction_id": str(tx.id),
-            "wallet_id": str(wallet_id),
-            "balance": str(new_balance),
-        }
+        request.session["success"] = f"Deposit successful. New balance: {new_balance}"
+
+        return RedirectResponse(
+            url="/wallet",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+        # return {
+        #     "transaction_id": str(tx.id),
+        #     "wallet_id": str(wallet_id),
+        #     "balance": str(new_balance),
+        # }
 
     except IntegrityError:
         # likely duplicate reference (transactions.reference is unique)
@@ -151,7 +167,7 @@ def withdraw(
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be > 0")
 
-    user_id = _coerce_uuid(user_id)
+    # user_id = _coerce_uuid(user_id)
 
     try:
         with db.begin():
@@ -188,11 +204,17 @@ def withdraw(
                 amount=-amount,  # debit
             ))
 
-        return {
-            "transaction_id": str(tx.id),
-            "wallet_id": str(wallet_id),
-            "balance": str(new_balance),
-        }
+        request.session["success"] = f"Withdrawal successful. New balance: {new_balance}"
+
+        return RedirectResponse(
+            url="/wallet",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+        # return {
+        #     "transaction_id": str(tx.id),
+        #     "wallet_id": str(wallet_id),
+        #     "balance": str(new_balance),
+        # }
 
     except IntegrityError:
         raise HTTPException(status_code=409, detail="Duplicate transaction reference")
