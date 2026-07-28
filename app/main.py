@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import ValidationError
+from scalar_fastapi import get_scalar_api_reference
 
 from app.core.config import settings
 from app.api.auth import router as auth_router
@@ -46,6 +47,13 @@ app.add_middleware(
     same_site="lax",
     https_only=False # True in production
 )
+
+@app.get("/scalar", include_in_schema=False)
+def get_scalar_docs():
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title="Scalar API",
+    )
 
 # Why this happens (important concept)
 
