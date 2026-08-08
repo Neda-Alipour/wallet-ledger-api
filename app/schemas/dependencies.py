@@ -16,7 +16,7 @@ def get_auth_service(db: DatabaseDep):
 # why Annotated not just Session = Depends(get_db)? because we want to specify the type of db parameter as Session for better type hinting and editor support 
 
 # Define a reusable type
-signup_dependency = Annotated[SignupSchema, Depends(SignupSchema.as_form)] 
-login_dependency = Annotated[LoginSchema, Depends(LoginSchema.as_form)] 
+SignupDep = Annotated[SignupSchema, Depends(SignupSchema.as_form)] 
+LoginDep = Annotated[LoginSchema, Depends(LoginSchema.as_form)] 
 
-AuthServiceDependency = Annotated[AuthService, Depends(get_auth_service)]
+AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
