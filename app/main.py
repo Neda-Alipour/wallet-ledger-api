@@ -8,8 +8,7 @@ from pydantic import ValidationError
 from scalar_fastapi import get_scalar_api_reference
 
 from app.core.config import settings
-from app.api.auth import router as auth_router
-from app.api.wallet import router as wallet_router
+from app.api.router import master_router
 
 app = FastAPI(title="Wallet Ledger API", version="1.0.0")
 
@@ -37,8 +36,7 @@ async def pydantic_validation_exception_handler(request: Request, exc: Validatio
         status_code=303
     )
 
-app.include_router(auth_router, tags=["auth"])
-app.include_router(wallet_router, tags=["wallet"])
+app.include_router(master_router)
 
 app.add_middleware(
     SessionMiddleware,

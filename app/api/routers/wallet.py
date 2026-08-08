@@ -1,26 +1,23 @@
-from typing import Annotated
+
 from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Form, HTTPException, status
-from sqlalchemy.orm import Session
 from sqlalchemy import update, select
 from sqlalchemy.exc import IntegrityError
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from app.db.session import get_db
 from app.models.user import User
 from app.models.wallet import Wallet
 from app.models.transaction import Transaction
 from app.models.ledger import LedgerEntry
 
-router = APIRouter()
+from app.schemas.dependencies import DatabaseDep
+
+router = APIRouter(tags=["wallet"])
 
 templates = Jinja2Templates(directory="app/templates")
-
-# Define a reusable type
-db_dependency = Annotated[Session, Depends(get_db)]
 
 def _coerce_uuid(value) -> UUID:
     try:
@@ -42,7 +39,7 @@ def require_user(request: Request):
 @router.get("/wallet", response_class=HTMLResponse, name="wallet")
 def wallet(
     request: Request, 
-    db: db_dependency,
+    db: DatabaseDep,
     user_id=Depends(require_user)
 ):
     # user_id = _coerce_uuid(user_id)
@@ -104,7 +101,7 @@ def wallet(
 @router.post("/wallet/deposit")
 def deposit(
     request: Request,
-    db: db_dependency,
+    db: DatabaseDep,
     amount: Decimal = Form(...),
     reference: str | None = Form(None),
     user_id=Depends(require_user),
@@ -159,7 +156,7 @@ def deposit(
 @router.post("/wallet/withdraw")
 def withdraw(
     request: Request,
-    db: db_dependency,
+    db: DatabaseDep,
     amount: Decimal = Form(...),
     reference: str | None = Form(None),
     user_id=Depends(require_user),
@@ -227,7 +224,7 @@ def withdraw(
 #     amount: Decimal = Form(...),
 #     reference: str | None = Form(None),
 #     user_id=Depends(require_user),
-#     db: db_dependency,
+#     db: DatabaseDep,
 # ):
 #     if amount <= 0:
 #         return RedirectResponse(url=f"/wallet?error=Amount must be > 0", status_code=303)
@@ -277,7 +274,7 @@ def withdraw(
 #     amount: Decimal = Form(...),
 #     reference: str | None = Form(None),
 #     user_id=Depends(require_user),
-#     db: db_dependency,
+#     db: DatabaseDep,
 # ):
 #     if amount <= 0:
 #         return RedirectResponse(url=f"/wallet?error=Amount must be > 0", status_code=303)
