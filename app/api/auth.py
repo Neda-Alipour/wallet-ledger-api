@@ -1,11 +1,8 @@
-from typing import Annotated
-from fastapi import APIRouter, Depends, Request
+
+from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
-
-
-from app.schemas.auth import SignupSchema, LoginSchema
 
 from app.models.user import User
 from app.models.wallet import Wallet
