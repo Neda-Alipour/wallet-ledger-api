@@ -7,7 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from pydantic import ValidationError
 from scalar_fastapi import get_scalar_api_reference
 
-from app.core.config import settings
+from app.core.config import db_settings
 from app.api.router import master_router
 
 app = FastAPI(title="Wallet Ledger API", version="1.0.0")
@@ -40,7 +40,7 @@ app.include_router(master_router)
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.SECRET_KEY,
+    secret_key=db_settings.SECRET_KEY,
     max_age=1800,  # 30 minutes
     same_site="lax",
     https_only=False # True in production

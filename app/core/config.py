@@ -10,4 +10,4 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
 # Create a single instance to be used across the app
-settings = Settings()
+db_settings = Settings()
