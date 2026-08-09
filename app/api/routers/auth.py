@@ -1,22 +1,26 @@
-from fastapi import APIRouter, HTTPException, Request, status
-from fastapi.responses import RedirectResponse, HTMLResponse
-from fastapi.templating import Jinja2Templates
+from typing import Annotated
 
-from app.schemas.dependencies import SignupDep, LoginDep, AuthServiceDep
+from fastapi import APIRouter, HTTPException, Request, status, Depends
+from fastapi.templating import Jinja2Templates
+from fastapi.security import OAuth2PasswordRequestForm
+
+from app.schemas.dependencies import AuthServiceDep
+from app.schemas.auth import AuthBase
+from app.schemas.user import UserRead
 from app.services.auth import UserAlreadyExistsError, WeakPasswordError
 
+
+from app.schemas.dependencies import UserDep
 
 router = APIRouter(tags=["auth"])
 
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.post("/signup")
-def signup(request: Request, auth_service: AuthServiceDep, form: SignupDep):
+@router.post("/signup", response_model=UserRead)
+def signup(credentials: AuthBase, currencies: list[str] | None, auth_service: AuthServiceDep):
     try:
-        user = auth_service.create_user_with_wallets(
-            email=form.email, password=form.password
-        )
+        user = auth_service.create_user_with_wallets(credentials, currencies)
 
     except UserAlreadyExistsError:
         raise HTTPException(
@@ -29,26 +33,29 @@ def signup(request: Request, auth_service: AuthServiceDep, form: SignupDep):
             detail=str(e),
         )
 
-    request.session["user_id"] = str(user.id)
-    return {"user_id": user.id}
+    # request.session["user_id"] = str(user.id)
+    return user
 
 
 @router.post("/login")
-def login(request: Request, auth_service: AuthServiceDep, form: LoginDep):
+def login(request_form: Annotated[OAuth2PasswordRequestForm, Depends()], auth_service: AuthServiceDep):
 
-    user = auth_service.authenticate_user(email=form.email, password=form.password)
+    token = auth_service.authenticate_user(email=request_form.username, password=request_form.password)
 
-    if not user:
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
 
     # Prevent Session Fixation: clear old session before setting new auth state
-    request.session.clear()
-    request.session["user_id"] = str(user.id)
+    # request.session.clear()
+    # request.session["user_id"] = str(user.id)
 
-    return {"user_id": user.id}
+    return {
+        "access_token": token,
+        "type": "jwt",
+    }
 
 
 @router.get("/logout")
@@ -58,23 +65,26 @@ def logout(request: Request):
         "message": "Logged out"
     }
 
+@router.get("/hello")
+def hello_page(user: UserDep):
+    return {"details": "hello"}
 
-@router.get("/signup", response_class=HTMLResponse)
-def signup_page(request: Request):
-    return templates.TemplateResponse(request=request, name="signup.html", context={})
+# @router.get("/signup", response_class=HTMLResponse)
+# def signup_page(request: Request):
+#     return templates.TemplateResponse(request=request, name="signup.html", context={})
 
 
-@router.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    error = request.session.pop("error", None)
-    return templates.TemplateResponse(
-        request=request,
-        name="login.html",
-        context={
-            "request": request,
-            "error": error,
-        },
-    )
+# @router.get("/login", response_class=HTMLResponse)
+# def login_page(request: Request):
+#     error = request.session.pop("error", None)
+#     return templates.TemplateResponse(
+#         request=request,
+#         name="login.html",
+#         context={
+#             "request": request,
+#             "error": error,
+#         },
+#     )
 
 
 # Old version

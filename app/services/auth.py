@@ -5,13 +5,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from app.models.wallet import Wallet
-
+from app.schemas.auth import AuthBase
+from app.utils import generate_access_token
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _DUMMY_HASH = pwd_context.hash("dummy-password-for-timing-safety")
 
 DEFAULT_WALLET_CURRENCIES = ("USD", "EUR", "GBP")
-MIN_PASSWORD_LENGTH = 8
 
 
 class UserAlreadyExistsError(Exception):
@@ -30,19 +30,11 @@ def verify_password(password: str, hashed: str) -> bool:
     return pwd_context.verify(password, hashed)
 
 
-def validate_password(password: str) -> None:
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise WeakPasswordError(
-            f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
-        )
-
-
 def normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
 def create_user(db: Session, email: str, password: str) -> User:
-    validate_password(password)
 
     user = User(
         email=normalize_email(email),
@@ -65,7 +57,7 @@ def create_wallets(
     user_id: str,
     currencies: list[str] | None = None,
 ) -> list[Wallet]:
-    
+
     currencies = currencies or list(DEFAULT_WALLET_CURRENCIES)
     wallets = [Wallet(user_id=user_id, currency=c, balance=0) for c in currencies]
     db.add_all(wallets)
@@ -80,16 +72,18 @@ class AuthService:
 
     def create_user_with_wallets(
         self,
-        email: str,
-        password: str,
+        credentials: AuthBase,
         currencies: list[str] | None = None,
     ) -> User:
 
         # Session.begin() used as a context manager already commits on success and rolls back on exception.
         try:
             with self.db.begin():
-
-                user = create_user(self.db, email, password)
+                user = create_user(
+                    self.db,
+                    credentials.email,
+                    credentials.password,
+                )
 
                 create_wallets(self.db, str(user.id), currencies=currencies)
 
@@ -97,21 +91,21 @@ class AuthService:
             raise
         except IntegrityError:
             # e.g. concurrent signup hit the unique constraint
-            raise UserAlreadyExistsError(email)
+            raise UserAlreadyExistsError(credentials.email)
 
         # Detach so caller can use it after commit without refresh errors
         self.db.refresh(user)
 
         return user
 
-    def authenticate_user(self, email: str, password: str) -> User | None:
-        
+    def authenticate_user(self, email: str, password: str) -> str | None:
+
         normalized_email = normalize_email(email)
 
         stmt = select(User).where(User.email == normalized_email)
         # More idiomatic than .scalars().first(), and it will raise if the query unexpectedly returns multiple rows (which would indicate a data integrity bug, e.g., missing unique constraint on email).
         user = self.db.execute(stmt).scalar_one_or_none()
-        
+
         # if not user or not verify_password(password, user.hashed_password):
         #     return None
         # If the user doesn't exist, verify_password (bcrypt hashing) is skipped entirely, so the response time for "no such user" is much faster than "wrong password". An attacker can use this timing difference to enumerate valid emails.
@@ -123,12 +117,20 @@ class AuthService:
         if not user or not valid:
             return None
 
-        return user
+        token = generate_access_token(data={
+            "user":{
+                "name": user.email, # change it to name later
+                "id": str(user.id)
+            }
+        })
+
+        return token
+
+    
 
 
 # why execute select? why not just query all? because SQLAlchemy 2.0 style uses select() statements instead of query() method for better clarity and performance.
 # user = db.query(User).filter(User.email == form.email).first()
-
 
 
 # def get_current_user(
