@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -9,8 +9,9 @@ from app.schemas.auth import AuthBase
 from app.schemas.user import UserRead
 from app.services.auth import UserAlreadyExistsError, WeakPasswordError
 
+from app.db.redis_db import add_jti_to_blacklist
+from app.schemas.dependencies import UserDep, get_access_token
 
-from app.schemas.dependencies import UserDep
 
 router = APIRouter(tags=["auth"])
 
@@ -33,7 +34,6 @@ def signup(credentials: AuthBase, currencies: list[str] | None, auth_service: Au
             detail=str(e),
         )
 
-    # request.session["user_id"] = str(user.id)
     return user
 
 
@@ -47,11 +47,7 @@ def login(request_form: Annotated[OAuth2PasswordRequestForm, Depends()], auth_se
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
-
-    # Prevent Session Fixation: clear old session before setting new auth state
-    # request.session.clear()
-    # request.session["user_id"] = str(user.id)
-
+    
     return {
         "access_token": token,
         "type": "jwt",
@@ -59,10 +55,10 @@ def login(request_form: Annotated[OAuth2PasswordRequestForm, Depends()], auth_se
 
 
 @router.get("/logout")
-def logout(request: Request):
-    request.session.clear()
+def logout_user(token_data: Annotated[dict, Depends(get_access_token)],):
+    add_jti_to_blacklist(token_data["jti"])
     return {
-        "message": "Logged out"
+        "details": "Logged out"
     }
 
 @router.get("/hello")

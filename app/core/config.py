@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
+    REDIS_HOST: str
+    REDIS_PORT: str
+
     # This configures how the settings are loaded
     model_config = _base_config
 
