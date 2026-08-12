@@ -4,13 +4,12 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 
-from app.schemas.dependencies import AuthServiceDep
 from app.schemas.auth import AuthBase
 from app.schemas.user import UserRead
 from app.services.auth import UserAlreadyExistsError, WeakPasswordError
 
 from app.db.redis_db import add_jti_to_blacklist
-from app.schemas.dependencies import UserDep, get_access_token
+from app.schemas.dependencies import get_access_token, AuthServiceDep
 
 
 router = APIRouter(tags=["auth"])
@@ -60,66 +59,3 @@ def logout_user(token_data: Annotated[dict, Depends(get_access_token)],):
     return {
         "details": "Logged out"
     }
-
-@router.get("/hello")
-def hello_page(user: UserDep):
-    return {"details": "hello"}
-
-# @router.get("/signup", response_class=HTMLResponse)
-# def signup_page(request: Request):
-#     return templates.TemplateResponse(request=request, name="signup.html", context={})
-
-
-# @router.get("/login", response_class=HTMLResponse)
-# def login_page(request: Request):
-#     error = request.session.pop("error", None)
-#     return templates.TemplateResponse(
-#         request=request,
-#         name="login.html",
-#         context={
-#             "request": request,
-#             "error": error,
-#         },
-#     )
-
-
-# Old version
-# @router.post("/signup")
-# def signup(
-#     request: Request,
-#     form: SignupSchema = Depends(SignupSchema.as_form),
-#     db: DatabaseDep
-# ):
-
-#     existing = db.query(User).filter(User.email == form.email).first()
-#     if existing:
-#         print("User already exists")
-#         return RedirectResponse(url="/signup", status_code=303)
-
-#     try:
-#         user = User(
-#             # full_name=full_name,
-#             email=form.email,
-#             hashed_password=hash_password(form.password)
-#         )
-#         db.add(user)
-#         db.flush()
-
-#         wallet = Wallet(
-#             user_id=user.id,
-#             currency="USD",
-#             balance=0
-#         )
-#         db.add(wallet)
-
-#         db.commit()
-#         db.refresh(user)
-
-#     except Exception as e:
-#         db.rollback()
-#         print(f"Error creating user: {e}")
-#         return RedirectResponse(url="/signup", status_code=303)
-
-#     request.session["user_id"] = str(user.id)
-
-#     return RedirectResponse(url="/wallet", status_code=303)

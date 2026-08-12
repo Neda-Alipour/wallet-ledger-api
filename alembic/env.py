@@ -7,9 +7,11 @@ from alembic import context
 
 from app.db.base import Base
 from app.core.config import db_settings
+from app.models import user, wallet, transaction, ledger, idempotency
 
 from dotenv import load_dotenv
 import os
+
 
 load_dotenv()
 
@@ -17,6 +19,7 @@ load_dotenv()
 # access to the values within the .ini file in use.
 config = context.config
 
+url = config.get_main_option("sqlalchemy.url", db_settings.DATABASE_URL)
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:

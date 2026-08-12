@@ -8,7 +8,7 @@ from app.core.config import security_settings
 
 def generate_access_token(
         data: dict,
-        expiry: timedelta = timedelta(seconds=60)
+        expiry: timedelta = timedelta(seconds=111160)
 ):
     token = jwt.encode(
                 payload={
@@ -34,5 +34,9 @@ def decode_access_token(token: str) -> dict | None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Expired token")
-    except jwt.PyJWKError:
-        return None
+    except (jwt.DecodeError, jwt.PyJWTError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
