@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.db.base import Base
@@ -35,4 +35,10 @@ class LedgerEntry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
+    )
+    wallet: Mapped["Wallet"] = relationship(
+        back_populates="ledger_entries",
+    )
+    transaction: Mapped["Transaction"] = relationship(
+        back_populates="ledger_entries",
     )
