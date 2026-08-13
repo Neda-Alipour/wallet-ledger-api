@@ -4,14 +4,15 @@ from app.models.user import User
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
-from app.models.wallet import Wallet
+from app.services.wallet import WalletService
+
 from app.schemas.auth import AuthBase
+from app.schemas.wallet import Currency
+
 from app.utils import generate_access_token
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _DUMMY_HASH = pwd_context.hash("dummy-password-for-timing-safety")
-
-DEFAULT_WALLET_CURRENCIES = ("USD", "EUR", "GBP")
 
 
 class UserAlreadyExistsError(Exception):
@@ -52,28 +53,19 @@ def create_user(db: Session, email: str, password: str) -> User:
     return user
 
 
-def create_wallets(
-    db: Session,
-    user_id: str,
-    currencies: list[str] | None = None,
-) -> list[Wallet]:
-
-    currencies = currencies or list(DEFAULT_WALLET_CURRENCIES)
-    wallets = [Wallet(user_id=user_id, currency=c, balance=0) for c in currencies]
-    db.add_all(wallets)
-    db.flush()  # Ensure wallets are added
-
-    return wallets
-
-
 class AuthService:
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        wallet_service: WalletService,
+    ):
         self.db = db
+        self.wallet_service = wallet_service
 
     def create_user_with_wallets(
         self,
         credentials: AuthBase,
-        currencies: list[str] | None = None,
+        currencies: list[Currency] | None = None,
     ) -> User:
 
         # Session.begin() used as a context manager already commits on success and rolls back on exception.
@@ -85,7 +77,10 @@ class AuthService:
                     credentials.password,
                 )
 
-                create_wallets(self.db, str(user.id), currencies=currencies)
+                self.wallet_service.create_wallets(
+                    str(user.id),
+                    currencies=currencies,
+                )
 
         except UserAlreadyExistsError:
             raise
@@ -117,16 +112,16 @@ class AuthService:
         if not user or not valid:
             return None
 
-        token = generate_access_token(data={
-            "user":{
-                "name": user.email, # change it to name later
-                "id": str(user.id)
+        token = generate_access_token(
+            data={
+                "user": {
+                    "name": user.email,  # change it to name later
+                    "id": str(user.id),
+                }
             }
-        })
+        )
 
         return token
-
-    
 
 
 # why execute select? why not just query all? because SQLAlchemy 2.0 style uses select() statements instead of query() method for better clarity and performance.

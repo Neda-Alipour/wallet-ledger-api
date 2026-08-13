@@ -18,12 +18,18 @@ from app.db.redis_db import is_jti_blacklisted
 DatabaseDep = Annotated[Session, Depends(get_db)]
 
 
-def get_auth_service(db: DatabaseDep):
-    return AuthService(db)
-
-
 def get_wallet_service(db: DatabaseDep):
     return WalletService(db)
+
+
+def get_auth_service(
+    db: DatabaseDep,
+    wallet_service: WalletService = Depends(get_wallet_service),
+):
+    return AuthService(
+        db,
+        wallet_service=wallet_service,
+    )
 
 
 def get_transaction_service(

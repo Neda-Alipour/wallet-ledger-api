@@ -18,9 +18,12 @@ templates = Jinja2Templates(directory="app/templates")
 
 
 @router.post("/signup", response_model=UserRead)
-def signup(credentials: AuthBase, currencies: list[str] | None, auth_service: AuthServiceDep):
+def signup(
+    credentials: AuthBase,
+    auth_service: AuthServiceDep,
+):
     try:
-        user = auth_service.create_user_with_wallets(credentials, currencies)
+        user = auth_service.create_user_with_wallets(credentials)
 
     except UserAlreadyExistsError:
         raise HTTPException(
@@ -37,16 +40,21 @@ def signup(credentials: AuthBase, currencies: list[str] | None, auth_service: Au
 
 
 @router.post("/login")
-def login(request_form: Annotated[OAuth2PasswordRequestForm, Depends()], auth_service: AuthServiceDep):
+def login(
+    request_form: Annotated[OAuth2PasswordRequestForm, Depends()],
+    auth_service: AuthServiceDep,
+):
 
-    token = auth_service.authenticate_user(email=request_form.username, password=request_form.password)
+    token = auth_service.authenticate_user(
+        email=request_form.username, password=request_form.password
+    )
 
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
-    
+
     return {
         "access_token": token,
         "type": "jwt",
@@ -54,8 +62,8 @@ def login(request_form: Annotated[OAuth2PasswordRequestForm, Depends()], auth_se
 
 
 @router.get("/logout")
-def logout_user(token_data: Annotated[dict, Depends(get_access_token)],):
+def logout_user(
+    token_data: Annotated[dict, Depends(get_access_token)],
+):
     add_jti_to_blacklist(token_data["jti"])
-    return {
-        "details": "Logged out"
-    }
+    return {"details": "Logged out"}
