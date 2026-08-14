@@ -22,7 +22,6 @@ class InsufficientBalanceError(Exception):
     pass
 
 
-
 class WalletService:
     def __init__(self, db: Session):
             self.db = db
@@ -39,6 +38,40 @@ class WalletService:
         self.db.flush()  # Ensure wallets are added
 
         return wallets
+
+    def get_wallet_by_user_id(
+        self,
+        user_id: UUID,
+        wallet_id: UUID,
+    ) -> Wallet:
+
+        wallet = self.db.execute(
+            select(Wallet).where(
+                Wallet.id == wallet_id,
+                Wallet.user_id == user_id,
+            )
+        ).scalar_one_or_none()
+
+        if wallet is None:
+            raise WalletNotFoundError()
+
+        return wallet
+
+    def get_wallet_by_id(
+            self,
+            wallet_id: UUID,
+        ) -> Wallet:
+    
+            wallet = self.db.execute(
+                select(Wallet).where(
+                    Wallet.id == wallet_id,
+                )
+            ).scalar_one_or_none()
+    
+            if wallet is None:
+                raise WalletNotFoundError()
+    
+            return wallet
 
     def get_active_wallet(
         self,
@@ -74,7 +107,7 @@ class WalletService:
     def increase_balance(
         self,
         wallet_id: UUID,
-        user_id: UUID,
+        # user_id: UUID,
         amount: Decimal,
     ) -> Wallet:
 
@@ -82,7 +115,7 @@ class WalletService:
             update(Wallet)
             .where(
                 Wallet.id == wallet_id,
-                Wallet.user_id == user_id,
+                # Wallet.user_id == user_id,
             )
             .values(balance=Wallet.balance + amount)
             .returning(Wallet)
@@ -98,26 +131,26 @@ class WalletService:
     def decrease_balance(
         self,
         wallet_id: UUID,
-        user_id: UUID,
+        # user_id: UUID,
         amount: Decimal,
     ) -> Wallet:
         
-        wallet_exists = self.db.execute(
-            select(Wallet).where(
-                Wallet.id == wallet_id,
-                Wallet.user_id == user_id,
-            )
-        ).scalar_one_or_none()
+        # wallet_exists = self.db.execute(
+        #     select(Wallet).where(
+        #         Wallet.id == wallet_id,
+        #         # Wallet.user_id == user_id,
+        #     )
+        # ).scalar_one_or_none()
 
-        if wallet_exists is None:
-            raise WalletNotFoundError()
+        # if wallet_exists is None:
+        #     raise WalletNotFoundError()
         
         # Wallet.balance >= amount means if the balance is $50, a withdrawal of $100 simply updates zero rows. So the opration is atomic.
         stmt = (
             update(Wallet)
             .where(
                 Wallet.id == wallet_id,
-                Wallet.user_id == user_id,
+                # Wallet.user_id == user_id,
                 Wallet.balance >= amount,
             )
             .values(balance=Wallet.balance - amount)

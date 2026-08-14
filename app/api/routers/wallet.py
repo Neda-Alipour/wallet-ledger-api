@@ -5,8 +5,9 @@ from sqlalchemy.exc import IntegrityError
 
 from app.schemas.dependencies import UserDep, TransactionServiceDep, WalletServiceDep
 from app.schemas.wallet import WalletReadItem, WalletsRead
-from app.schemas.transaction import CreateTransaction, RecentTransactionRead, RecentTransactionsRead, TransactionOperationRead
+from app.schemas.transaction import CreateTransaction, RecentTransactionsRead, TransactionOperationRead, CreateTransfer,  TransferRead
 from app.services.wallet import WalletNotFoundError, InsufficientBalanceError
+from app.services.transaction import WalletCurrencyMismatchError, InvalidTransferError
 
 
 
@@ -164,6 +165,77 @@ def withdraw(
         raise HTTPException(
             status_code=400,
             detail="Insufficient wallet balance.",
+        )
+
+    except IntegrityError:
+        raise HTTPException(
+            status_code=409,
+            detail="Transaction reference already exists.",
+        )
+
+
+@router.post(
+    "/transfer",
+    response_model=TransferRead,
+)
+def transfer(
+    user: UserDep,
+    data: CreateTransfer,
+    service: TransactionServiceDep,
+):
+    try:
+        (
+            transaction,
+            source_wallet,
+            destination_wallet,
+        ) = service.transfer(
+            user_id=user.id,
+            source_wallet_id=data.source_wallet_id,
+            destination_wallet_id=data.destination_wallet_id,
+            amount=data.amount,
+            reference=data.reference,
+        )
+
+        return TransferRead(
+            transaction_id=transaction.id,
+            wallet_id=source_wallet.id,
+            destination_wallet_id=destination_wallet.id,
+            amount=data.amount,
+            balance=source_wallet.balance,
+            type=transaction.type,
+            status=transaction.status,
+            reference=transaction.reference,
+            created_at=transaction.created_at,
+        )
+
+    except WalletNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="Wallet not found.",
+        )
+
+    except InsufficientBalanceError:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient wallet balance.",
+        )
+
+    except WalletCurrencyMismatchError:
+        raise HTTPException(
+            status_code=400,
+            detail="Source and destination wallets must use the same currency.",
+        )
+
+    except ValueError as e:
+        raise HTTPException(
+            status_code=400,
+            detail=str(e),
+        )
+
+    except InvalidTransferError:
+        raise HTTPException(
+            status_code=400,
+            detail="Source and destination wallets must be different.",
         )
 
     except IntegrityError:

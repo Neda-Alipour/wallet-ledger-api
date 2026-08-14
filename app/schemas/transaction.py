@@ -56,3 +56,12 @@ class CreateTransaction(BaseModel):
 
         return value or None
 
+
+class CreateTransfer(CreateTransaction):
+    source_wallet_id: UUID
+    destination_wallet_id: UUID
+
+
+class TransferRead(TransactionOperationRead):
+    destination_wallet_id: UUID
+    # destination_balance: Decimal
