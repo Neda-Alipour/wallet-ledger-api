@@ -1,7 +1,6 @@
 from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, status, Depends
-from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.schemas.auth import AuthBase
@@ -12,9 +11,7 @@ from app.db.redis_db import add_jti_to_blacklist
 from app.schemas.dependencies import get_access_token, AuthServiceDep
 
 
-router = APIRouter(tags=["auth"])
-
-templates = Jinja2Templates(directory="app/templates")
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/signup", response_model=UserRead)

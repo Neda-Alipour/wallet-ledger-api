@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 from pydantic import ValidationError
 from scalar_fastapi import get_scalar_api_reference
@@ -14,26 +14,25 @@ app = FastAPI(title="Wallet Ledger API", version="1.0.0")
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-templates = Jinja2Templates(directory="app/templates")
+# templates = Jinja2Templates(directory="app/templates")
 
 @app.exception_handler(RequestValidationError)
 async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
-    referer = request.headers.get("referer", "/login")
-    return RedirectResponse(
-        url=referer + "?error=Invalid input",
-        status_code=303
+    error_msg = exc.errors()[0]["msg"]
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,  # HTTP 422
+        content={"detail": error_msg},
     )
 
 @app.exception_handler(ValidationError)
 async def pydantic_validation_exception_handler(request: Request, exc: ValidationError):
-    referer = request.headers.get("referer", "/login")
 
     # extract first error message nicely
     error_msg = exc.errors()[0]["msg"]
 
-    return RedirectResponse(
-        url=referer + f"?error={error_msg}",
-        status_code=303
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,  # HTTP 422
+        content={"detail": error_msg},
     )
 
 app.include_router(master_router)

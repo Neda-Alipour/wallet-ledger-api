@@ -10,11 +10,11 @@ from app.services.wallet import WalletNotFoundError, InsufficientBalanceError
 
 
 
-router = APIRouter(tags=["wallet"])
+router = APIRouter(prefix="/wallet", tags=["wallet"])
 
 
 @router.get(
-    "/wallet",
+    "/",
     name="wallet",
     response_model=WalletReadItem,
 )
@@ -87,7 +87,7 @@ def transactions(
 
 
 @router.post(
-    "/wallet/deposit",
+    "/deposit",
     response_model=TransactionOperationRead,
 )
 def deposit(
@@ -128,7 +128,7 @@ def deposit(
         )
 
 
-@router.post("/wallet/withdraw", response_model=TransactionOperationRead,)
+@router.post("/withdraw", response_model=TransactionOperationRead,)
 def withdraw(
     user: UserDep,
         data: CreateTransaction,
