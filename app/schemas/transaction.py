@@ -3,7 +3,7 @@ from enum import Enum
 from uuid import UUID
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class TransactionType(str, Enum):
@@ -31,15 +31,28 @@ class RecentTransactionRead(TransactionRead):
     wallet_id: UUID
     amount: Decimal
 
+    
+class TransactionOperationRead(RecentTransactionRead):
+    balance: Decimal
+
 
 class RecentTransactionsRead(BaseModel):
     transactions: list[RecentTransactionRead]
 
 
-class DepositCreate(BaseModel):
+class CreateTransaction(BaseModel):
     amount: Decimal = Field(
         gt=0,
         max_digits=18,
         decimal_places=2
     )
+    reference: str | None = None
+
+    @field_validator("reference")
+    @classmethod
+    def empty_reference_to_none(cls, value: str | None) -> str | None:
+        if value is not None:
+            value = value.strip()
+
+        return value or None
 

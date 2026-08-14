@@ -73,7 +73,7 @@ class TransactionService:
         wallet_id: UUID | None = None,
         limit: int = 20,
     ):
-
+        
         stmt = (
             select(
                 Transaction.id.label("transaction_id"),
@@ -96,7 +96,7 @@ class TransactionService:
         )
 
         rows = self.db.execute(stmt).mappings().all()
-
+        
         return TypeAdapter(list[RecentTransactionRead]).validate_python(rows)
 
     def deposit(
@@ -139,3 +139,44 @@ class TransactionService:
         except Exception:
             self.db.rollback()
             raise
+
+
+    def withdraw(
+        self,
+        user_id: UUID,
+        wallet_id: UUID,
+        amount: Decimal,
+        reference: str | None = None,
+    ):
+        try:
+            transaction = create_transaction(
+                self.db,
+                transaction_type=TransactionType.WITHDRAWAL,
+                reference=reference,
+            )
+
+            wallet = self.wallet_service.decrease_balance(
+                wallet_id=wallet_id,
+                user_id=user_id,
+                amount=amount,
+            )
+
+            ledger_entry = create_ledger_entry(
+                self.db,
+                wallet_id=wallet.id,
+                transaction_id=transaction.id,
+                amount=-amount, # the difference between deposit and withdrawal
+            )
+
+            self.db.commit()
+
+            self.db.refresh(transaction)
+            self.db.refresh(ledger_entry)
+            self.db.refresh(wallet)
+
+            return transaction, ledger_entry, wallet
+
+        except Exception:
+            self.db.rollback()
+            raise
+
