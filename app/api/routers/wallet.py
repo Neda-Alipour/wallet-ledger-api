@@ -5,10 +5,15 @@ from sqlalchemy.exc import IntegrityError
 
 from app.schemas.dependencies import UserDep, TransactionServiceDep, WalletServiceDep
 from app.schemas.wallet import WalletReadItem, WalletsRead
-from app.schemas.transaction import CreateTransaction, RecentTransactionsRead, TransactionOperationRead, CreateTransfer,  TransferRead
+from app.schemas.transaction import (
+    CreateTransaction,
+    RecentTransactionsRead,
+    TransactionOperationRead,
+    CreateTransfer,
+    TransferRead,
+)
 from app.services.wallet import WalletNotFoundError, InsufficientBalanceError
 from app.services.transaction import WalletCurrencyMismatchError, InvalidTransferError
-
 
 
 router = APIRouter(prefix="/wallet", tags=["wallet"])
@@ -17,31 +22,32 @@ router = APIRouter(prefix="/wallet", tags=["wallet"])
 @router.get(
     "/",
     name="wallet",
-    response_model=WalletReadItem,
+    response_model=WalletsRead,
 )
 def wallet(
     user: UserDep,
     wallet_service: WalletServiceDep,
     wallet_id: UUID | None = None,
 ):
+    wallets = user.wallets
+    # if we always create wallet on signup, this may never happen; still safer to handle.
+    if not wallets:
+        raise HTTPException(
+            status_code=404,
+            detail="No wallets found.",
+        )
 
-    # wallets = user.wallets
-    # # if we always create wallet on signup, this may never happen; still safer to handle.
-    # if not wallets:
-    #     raise HTTPException(
-    #         status_code=404,
-    #         detail="No wallets found.",
-    #     )
-
-    # print(wallets)
     try:
         active_wallet = wallet_service.get_active_wallet(
             user=user,
             wallet_id=wallet_id,
         )
 
-        return active_wallet
-    
+        return WalletsRead(
+            wallet=active_wallet,
+            wallets=wallets,
+        )
+
     except WalletNotFoundError:
         raise HTTPException(
             status_code=404,
@@ -78,13 +84,14 @@ def transactions(
 
         return RecentTransactionsRead(
             transactions=transactions,
+            currency=active_wallet.currency
         )
+    
     except WalletNotFoundError:
         raise HTTPException(
             status_code=404,
             detail="Wallet not found.",
         )
-
 
 
 @router.post(
@@ -108,6 +115,7 @@ def deposit(
         return TransactionOperationRead(
             transaction_id=transaction.id,
             wallet_id=wallet.id,
+            currency=wallet.currency,
             amount=ledger_entry.amount,
             balance=wallet.balance,
             type=transaction.type,
@@ -117,10 +125,10 @@ def deposit(
         )
 
     except WalletNotFoundError:
-            raise HTTPException(
-                status_code=404,
-                detail="Wallet not found.",
-            )
+        raise HTTPException(
+            status_code=404,
+            detail="Wallet not found.",
+        )
 
     except IntegrityError:
         raise HTTPException(
@@ -129,12 +137,15 @@ def deposit(
         )
 
 
-@router.post("/withdraw", response_model=TransactionOperationRead,)
+@router.post(
+    "/withdraw",
+    response_model=TransactionOperationRead,
+)
 def withdraw(
     user: UserDep,
-        data: CreateTransaction,
-        wallet_id: UUID,
-        service: TransactionServiceDep,
+    data: CreateTransaction,
+    wallet_id: UUID,
+    service: TransactionServiceDep,
 ):
     try:
         transaction, ledger_entry, wallet = service.withdraw(
@@ -147,6 +158,7 @@ def withdraw(
         return TransactionOperationRead(
             transaction_id=transaction.id,
             wallet_id=wallet.id,
+            currency=wallet.currency,
             amount=ledger_entry.amount,
             balance=wallet.balance,
             type=transaction.type,
@@ -154,7 +166,7 @@ def withdraw(
             reference=transaction.reference,
             created_at=transaction.created_at,
         )
-    
+
     except WalletNotFoundError:
         raise HTTPException(
             status_code=404,
@@ -199,6 +211,7 @@ def transfer(
         return TransferRead(
             transaction_id=transaction.id,
             wallet_id=source_wallet.id,
+            currency=source_wallet.currency,
             destination_wallet_id=destination_wallet.id,
             amount=data.amount,
             balance=source_wallet.balance,

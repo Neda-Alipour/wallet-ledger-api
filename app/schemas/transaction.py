@@ -34,9 +34,11 @@ class RecentTransactionRead(TransactionRead):
     
 class TransactionOperationRead(RecentTransactionRead):
     balance: Decimal
+    currency: str
 
 
 class RecentTransactionsRead(BaseModel):
+    currency: str
     transactions: list[RecentTransactionRead]
 
 
